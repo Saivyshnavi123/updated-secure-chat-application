@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% block content %}
+<head>
+    <meta charset="UTF-8">
+    <title>Send Message</title>
+    <style>
+        body {
+            background: url('/static/images/bg.jpg') no-repeat center center fixed;
+            background-size: cover;
+            font-family: Arial, sans-serif;
+        }
+        .auth-container {
+            max-width: 500px;
+            margin: 100px auto;
+            padding: 30px;
+            background-color: rgba(255, 255, 255, 0.95);
+            border-radius: 10px;
+            box-shadow: 0px 0px 20px rgba(0,0,0,0.2);
+        }
+        input[type="email"], input[type="url"], textarea {
+            width: 100%;
+        }
+        button, .btn {
+            width: 100%;
+        }
+    </style>
+</head>
+<div class="form-card">
+  <div class="auth-container">
+    <h2 class="text-center mb-4">📤 Send Secure Message</h2>
+    {% if error %}
+      <div class="alert alert-danger">{{ error }}</div>
+    {% endif %}
+    {% if message %}
+      <div class="alert alert-success">{{ message }}</div>
+      {% if warning %}
+        <div class="alert alert-warning">{{ warning }}</div>
+      {% endif %}
+    {% endif %}
+    <form method="post" onsubmit="return handleSendMessage(event)">
+      <div class="mb-3">
+        <label>Recipient Email:</label>
+        <input type="email" class="form-control" name="recipient_email" id="recipient_email" required>
+      </div>
+      <div class="mb-3">
+        <label>GitHub Verification URL (optional):</label>
+        <input type="url" class="form-control" name="verification_url" id="verification_url">
+      </div>
+      <div class="mb-3">
+        <label>Message:</label>
+        <textarea class="form-control" name="message" id="message" rows="5" required></textarea>
+      </div>
+      <input type="hidden" name="encrypted_message" id="encrypted_message">
+      <input type="hidden" name="encrypted_key" id="encrypted_key">
+      <input type="hidden" name="nonce" id="nonce">
+      <button type="submit" class="btn btn-success w-100">Send Message</button>
+    </form>
+    <div class="mt-3 text-center">
+      <a href="{{ url_for('home') }}">← Back to Messages</a>
+    </div>
+  </div>
+</div>
+<script>
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary).replace(/(.{64})/g, "$1\n").trim();
+}
+
+async function importPublicKey(pem) {
+  try {
+    const cleanPem = pem.replace(/-----BEGIN PUBLIC KEY-----|-----END PUBLIC KEY-----|\n|\r/g, '');
+    if (!cleanPem) throw new Error("Empty PEM data after cleaning");
+    const binaryDer = new Uint8Array(atob(cleanPem).split('').map(c => c.charCodeAt(0)));
+    return await crypto.subtle.importKey(
+      "spki",
+      binaryDer,
+      { name: "RSA-OAEP", hash: "SHA-256" },
+      true,
+      ["encrypt"]
+    );
+  } catch (err) {
+    throw new Error(`Failed to import public key: ${err.message}`);
+  }
+}
+
+async function handleSendMessage(event) {
+  event.preventDefault();
+  try {
+    const recipientEmail = document.getElementById('recipient_email').value;
+    const message = document.getElementById('message').value;
+    const verificationUrl = document.getElementById('verification_url').value;
+
+    // Validate message encoding
+    const encoder = new TextEncoder();
+    const messageBytes = encoder.encode(message);
+    if (messageBytes.length === 0) {
+      throw new Error("Message is empty or contains invalid characters");
+    }
+
+    // Fetch recipient's public key
+    console.debug(`Fetching public key for ${recipientEmail}`);
+    const response = await fetch('/get_public_key', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `email=${encodeURIComponent(recipientEmail)}`
+    });
+    const data = await response.json();
+    if (data.error) {
+      alert('Error: ' + data.error);
+      return false;
+    }
+
+    console.debug("Importing public key");
+    const publicKey = await importPublicKey(data.public_key);
+
+    // Generate AES key
+    console.debug("Generating AES key");
+    const aesKey = await crypto.subtle.generateKey(
+      { name: "AES-CBC", length: 128 },
+      true,
+      ["encrypt", "decrypt"]
+    );
+
+    // Encrypt message with AES-CBC
+    console.debug("Encrypting message with AES-CBC");
+    const paddingLength = 16 - (messageBytes.length % 16);
+    const paddedMessage = new Uint8Array([...messageBytes, ...new Array(paddingLength).fill(paddingLength)]);
+    const nonce = crypto.getRandomValues(new Uint8Array(16));
+    const encryptedMessage = await crypto.subtle.encrypt(
+      { name: "AES-CBC", iv: nonce },
+      aesKey,
+      paddedMessage
+    );
+
+    // Encrypt AES key with RSA-OAEP
+    console.debug("Encrypting AES key with RSA-OAEP");
+    const exportedAesKey = await crypto.subtle.exportKey("raw", aesKey);
+    const encryptedKey = await crypto.subtle.encrypt(
+      { name: "RSA-OAEP" },
+      publicKey,
+      exportedAesKey
+    );
+
+    // Set form fields
+    document.getElementById('encrypted_message').value = arrayBufferToBase64(encryptedMessage);
+    document.getElementById('encrypted_key').value = arrayBufferToBase64(encryptedKey);
+    document.getElementById('nonce').value = arrayBufferToBase64(nonce);
+
+    console.debug("Submitting encrypted message");
+    event.target.submit();
+  } catch (err) {
+    console.error('Encryption error:', err);
+    alert('Error encrypting message: ' + err.message);
+    return false;
+  }
+}
+</script>
+{% endblock %}

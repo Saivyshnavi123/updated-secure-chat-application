@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block content %}
+<head>
+    <meta charset="UTF-8">
+    <title>Secure Messages</title>
+    <style>
+        body {
+            background: url('/static/images/bg.jpg') no-repeat center center fixed;
+            background-size: cover;
+            font-family: Arial, sans-serif;
+        }
+        .message-card {
+            position: relative;
+        }
+        .delete-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            cursor: pointer;
+            color: red;
+            font-size: 1.2em;
+        }
+    </style>
+</head>
+<h2 class="mb-4 text-center">📨 Your Secure Messages</h2>
+{% if messages %}
+  <div class="row" id="message-container">
+    {% for msg in messages %}
+      <div class="col-md-6">
+        <div class="card mb-4 shadow message-card">
+          <div class="card-header text-white bg-dark">
+            From: {{ msg[1] | safe }}
+            <span class="delete-btn" onclick="deleteMessage({{ msg[0] }})">✖</span>
+          </div>
+          <div class="card-body">
+            <p id="message-{{ msg[0] }}">Decrypting...</p>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="alert alert-info text-center">No messages found.</div>
+{% endif %}
+<script>
+function base64ToArrayBuffer(base64) {
+  try {
+    const cleanBase64 = base64.replace(/\s/g, '');
+    if (!cleanBase64) throw new Error("Empty base64 string");
+    const binaryString = atob(cleanBase64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes.buffer;
+  } catch (err) {
+    throw new Error(`Base64 decoding failed: ${err.message || 'Invalid data'}`);
+  }
+}
+
+async function importPrivateKey(pem) {
+  try {
+    const cleanPem = pem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\n|\r/g, '');
+    if (!cleanPem) throw new Error("Empty private key");
+    const binaryDer = base64ToArrayBuffer(cleanPem);
+    return await crypto.subtle.importKey(
+      "pkcs8",
+      binaryDer,
+      { name: "RSA-OAEP", hash: "SHA-256" },
+      false,
+      ["decrypt"]
+    );
+  } catch (err) {
+    throw new Error(`Key import failed: ${err.message || 'Invalid key format'}`);
+  }
+}
+
+async function decryptMessage(messageId, encryptedMessageB64, encryptedKeyB64, nonceB64) {
+  try {
+    // Validate inputs
+    if (!encryptedMessageB64 || !encryptedKeyB64 || !nonceB64) {
+      throw new Error("Missing message, key, or nonce");
+    }
+    console.log(`Message ${messageId}: Input lengths - message: ${encryptedMessageB64.length}, key: ${encryptedKeyB64.length}, nonce: ${nonceB64.length}`);
+
+    // Get private key
+    const privateKeyPem = localStorage.getItem('private_key');
+    if (!privateKeyPem) {
+      throw new Error("No private key found. Please re-sign up.");
+    }
+    console.log(`Message ${messageId}: Found private key`);
+
+    // Import private key
+    const privateKey = await importPrivateKey(privateKeyPem);
+    console.log(`Message ${messageId}: Private key imported`);
+
+    // Decrypt AES key
+    const encryptedKey = base64ToArrayBuffer(encryptedKeyB64);
+    const aesKey = await crypto.subtle.decrypt(
+      { name: "RSA-OAEP" },
+      privateKey,
+      encryptedKey
+    );
+    console.log(`Message ${messageId}: AES key decrypted`);
+
+    // Import AES key
+    const aesCryptoKey = await crypto.subtle.importKey(
+      "raw",
+      aesKey,
+      { name: "AES-CBC" },
+      false,
+      ["decrypt"]
+    );
+
+    // Decrypt message
+    const encryptedMessage = base64ToArrayBuffer(encryptedMessageB64);
+    const nonce = base64ToArrayBuffer(nonceB64);
+    if (nonce.byteLength !== 16) {
+      throw new Error(`Invalid nonce length: ${nonce.byteLength} bytes`);
+    }
+    const decryptedBytes = await crypto.subtle.decrypt(
+      { name: "AES-CBC", iv: nonce },
+      aesCryptoKey,
+      encryptedMessage
+    );
+
+    // Remove padding
+    const bytes = new Uint8Array(decryptedBytes);
+    if (bytes.length === 0) {
+      throw new Error("Decrypted message is empty");
+    }
+    const paddingLength = bytes[bytes.length - 1];
+    if (paddingLength < 1 || paddingLength > 16) {
+      throw new Error(`Invalid padding length: ${paddingLength}`);
+    }
+    const message = new TextDecoder().decode(bytes.slice(0, -paddingLength));
+
+    // Display message
+    document.getElementById(`message-${messageId}`).textContent = message || "Empty message";
+    console.log(`Message ${messageId}: Decryption successful`);
+  } catch (err) {
+    const errorMessage = err.message || "Unknown error during decryption";
+    console.error(`Error decrypting message ${messageId}: ${errorMessage}`);
+    document.getElementById(`message-${messageId}`).textContent = `Error: ${errorMessage}`;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  {% for msg in messages %}
+    const encryptedMessage = '{{ msg[2] | replace("\n", "") | replace("\r", "") | safe }}';
+    const encryptedKey = '{{ msg[3] | replace("\n", "") | replace("\r", "") | safe }}';
+    const nonce = '{{ msg[4] | replace("\n", "") | replace("\r", "") | safe }}';
+    console.log(`Processing message {{ msg[0] }}`);
+    decryptMessage({{ msg[0] }}, encryptedMessage, encryptedKey, nonce);
+  {% endfor %}
+});
+
+function deleteMessage(messageId) {
+  if (confirm('Are you sure you want to delete this message?')) {
+    fetch('/delete_message', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `message_id=${messageId}`
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        location.reload();
+      } else {
+        alert('Error deleting message: ' + (data.error || 'Unknown error'));
+      }
+    })
+    .catch(error => alert('Error deleting message: ' + error));
+  }
+}
+</script>
+{% endblock %}
