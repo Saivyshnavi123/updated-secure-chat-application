@@ -17,9 +17,9 @@ This project is a Flask-based web application designed for secure messaging, imp
 
 The proejct requires a secure messaging application with a mechanism to verify user identities, protecting against a malicious server swapping public keys. This is achieved through:
 
-- **PK/DNS Based Identity**: Users post their public key to a public GitHub Gist (e.g., `https://gist.githubusercontent.com/Caxzen/0e795385c414ac7bddffd8883554fcf5/raw/9868773a0b2f9c95fd3861371dac3e0a9d331835/public_key.pem`) and provide the URL during signup. The application verifies the recipient’s public key against this URL before sending a message, ensuring the key hasn’t been tampered with. GitHub’s HTTPS URLs align with the “DNS based” aspect, and Gists serve as a “social media based identity” due to their public, user-associated nature.
+- **PK/DNS Based Identity**: Users post their public key to a public GitHub Gist (e.g., `https://gist.githubusercontent.com/Koushik168/eed68df34fd32cd0449d3db86dfd4189/raw/2b88b0911bfe177e73c7ba1451fb0523ccb96fcc/public_key.pem`) and provide the URL during signup. The application verifies the recipient’s public key against this URL before sending a message, ensuring the key hasn’t been tampered with. GitHub’s HTTPS URLs align with the “DNS based” aspect, and Gists serve as a “social media based identity” due to their public, user-associated nature.
 - **Security**: Messages are encrypted with AES and RSA, ensuring confidentiality. HTTPS (enabled via hosting) secures data in transit.
-- **Accessibility**: The application can be hosted on PythonAnywhere, providing a public URL for testing (e.g., `https://yourusername.pythonanywhere.com`).
+- **Accessibility**: The application can be hosted on PythonAnywhere, providing a public URL for testing (e.g., `https://caxy.pythonanywhere.com`).
 
 ## Installation
 
@@ -31,7 +31,7 @@ The proejct requires a secure messaging application with a mechanism to verify u
 ### Setup
 1. **Clone the Repository**:
    ```bash
-   git clone https://github.com/yourusername/your-repo.git
+    git clone https://github.com/Saivyshnavi123/Chat-application.git 
    cd your-repo
    ```
 
@@ -72,8 +72,8 @@ To deploy the application online, use PythonAnywhere’s free tier:
 2. **Clone Repository**:
    - In a Bash console:
      ```bash
-     git clone https://github.com/yourusername/your-repo.git /home/yourusername/mysite
-     cd /home/yourusername/mysite
+      git clone https://github.com/Saivyshnavi123/Chat-application.git 
+     cd  Chat-application
      ```
 3. **Set Up Virtual Environment**:
    ```bash
@@ -87,26 +87,26 @@ To deploy the application online, use PythonAnywhere’s free tier:
    ```
 5. **Configure Web App**:
    - In the “Web” tab, create a manual configuration web app (Python 3.9).
-   - Set source code path: `/home/yourusername/mysite`.
+   - Set source code path: `/home/caxy/mysite`.
    - Set virtualenv: `myenv`.
-   - Edit WSGI file (`/var/www/yourusername_pythonanywhere_com_wsgi.py`):
+   - Edit WSGI file (`/var/www/caxy_pythonanywhere_com_wsgi.py`):
      ```python
      import sys
-     project_home = '/home/yourusername/mysite'
+     project_home = '/home/caxy/mysite'
      if project_home not in sys.path:
          sys.path.append(project_home)
      from app import app as application
      ```
-   - Set working directory: `/home/yourusername/mysite`.
-   - Add static file mapping: URL `/static/` to `/home/yourusername/mysite/static`.
+   - Set working directory: `/home/caxy/mysite`.
+   - Add static file mapping: URL `/static/` to `/home/caxy/mysite/static`.
 6. **Enable HTTPS**: In the “Web” tab, enable “Force HTTPS”.
-7. **Reload**: Click “Reload” and access at `https://yourusername.pythonanywhere.com`.
+7. **Reload**: Click “Reload” and access at `https://caxy.pythonanywhere.com`.
 
 ## Usage
 
 1. **Sign Up**:
    - Navigate to `/signup`.
-   - Enter an email, password, and optionally a GitHub Gist URL containing your public key (e.g., `https://gist.githubusercontent.com/Caxzen/0e795385c414ac7bddffd8883554fcf5/raw/9868773a0b2f9c95fd3861371dac3e0a9d331835/public_key.pem`).
+   - Enter an email, password, and optionally a GitHub Gist URL containing your public key (e.g., `https://gist.githubusercontent.com/Koushik168/eed68df34fd32cd0449d3db86dfd4189/raw/2b88b0911bfe177e73c7ba1451fb0523ccb96fcc/public_key.pem`).
    - Copy the displayed public key and create a public Gist:
      - Go to [GitHub Gists](https://gist.github.com).
      - Paste the key into a file (e.g., `public_key.pem`), set as public, and copy the raw URL.
