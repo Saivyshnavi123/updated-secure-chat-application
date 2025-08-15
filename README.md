@@ -31,7 +31,7 @@ The proejct requires a secure messaging application with a mechanism to verify u
 ### Setup
 1. **Clone the Repository**:
    ```bash
-    git clone https://github.com/Saivyshnavi123/Chat-application.git 
+    git clone https://github.com/Saivyshnavi123/updated-secure-chat-application.git 
    cd your-repo
    ```
 
@@ -72,7 +72,7 @@ To deploy the application online, use PythonAnywhere’s free tier:
 2. **Clone Repository**:
    - In a Bash console:
      ```bash
-      git clone https://github.com/Saivyshnavi123/Chat-application.git 
+      git clone https://github.com/Saivyshnavi123/updated-secure-chat-application.git 
      cd  Chat-application
      ```
 3. **Set Up Virtual Environment**:
